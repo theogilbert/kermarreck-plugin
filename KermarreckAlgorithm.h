@@ -2,6 +2,11 @@
 #define PROJECT_KERMARRECKPLUGIN_H
 
 #include <tulip/TulipPluginHeaders.h>
+#include <string>
+#include <stdlib.h>
+#include <time.h>
+#include <thread>
+#include <future>
 
 class KermarreckAlgorithm:public tlp::DoubleAlgorithm {
 public:
@@ -17,6 +22,8 @@ public:
     KermarreckAlgorithm(const tlp::PluginContext* context);
 
     bool run();
+protected:	
+	double randomWalk(tlp::node n, double nbReturnTime);
 };
 
 
