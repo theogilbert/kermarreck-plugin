@@ -1,4 +1,5 @@
 #include <iostream>
+#include <limits>
 #include "NodeWalkInfo.h"
 
 
@@ -6,8 +7,11 @@ NodeWalkInfo::NodeWalkInfo() :
     NodeWalkInfo(0, 0)
 {}
 
+// A lower standard deviation means the node is more central. So a node that is never walked on needs to have a big
+// value as its default standard deviation value
 NodeWalkInfo::NodeWalkInfo(unsigned int threadCount, unsigned int requiredReturns) :
-    standardDeviation(0), threadCount(threadCount), requiredReturns(requiredReturns), lastThreadTick(threadCount, -1)
+    standardDeviation(std::numeric_limits<double>::max()), threadCount(threadCount),
+    requiredReturns(requiredReturns), lastThreadTick(threadCount, -1)
 {}
 
 NodeWalkInfo::NodeWalkInfo(const NodeWalkInfo &other) {
@@ -33,6 +37,8 @@ void NodeWalkInfo::submitTick(unsigned int threadId, unsigned int tick) {
 
         int lastTick = lastThreadTick[threadId];
 
+        mutex.lock();
+
         if(lastTick > 0) {
 
             returnTimes.push_back(tick - lastTick);
@@ -43,6 +49,8 @@ void NodeWalkInfo::submitTick(unsigned int threadId, unsigned int tick) {
         }
 
         lastThreadTick[threadId] = tick;
+        
+        mutex.unlock();
     }
     else {
         std::cerr << "Error - wrong thread id " << threadId << std::endl;

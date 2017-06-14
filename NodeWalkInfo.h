@@ -1,7 +1,3 @@
-//
-// Created by z3tyop on 10/06/17.
-//
-
 #ifndef PROJECT_NODEWALKINFO_H
 #define PROJECT_NODEWALKINFO_H
 
@@ -9,7 +5,13 @@
 #include <vector>
 #include <cmath>
 #include <map>
+#include <mutex>
 
+
+/*
+ * Class used to keep track of the times a node has been walked onto, and to calculate the standard deviation associated
+ * with those return times
+ */
 class NodeWalkInfo {
 
 public:
@@ -41,6 +43,8 @@ private:
     unsigned int requiredReturns;
 
     unsigned int threadCount;
+
+    std::mutex mutex;
 
 };
 
