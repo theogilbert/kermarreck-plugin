@@ -1,8 +1,8 @@
-cmake_minimum_required(VERSION 3.7)
+cmake_minimum_required(VERSION 2.8)
 
 # Do not forget to set the following variables :
 #CMAKE_MODULE_PATH    -> tulip-install/share/tulip
-#QT_QMAKE_EXECUTABLE  -> path to qmake.exe
+#QT_QMAKE_EXECUTABLE  -> path to qmakeexe
 #TULIP_INCLUDE_DIR    -> tulip-install/include
 #QT_INCLUDE_DIR       -> qt-install/include
 #TULIP_PLUGINS_PATH   -> tulip-install/lib/tulip
@@ -19,7 +19,7 @@ FIND_PACKAGE(Qt4 REQUIRED)
 INCLUDE(${QT_USE_FILE})
 
 SET(CPP_FILES
-        KermarreckAlgorithm.cpp KermarreckAlgorithm.h)
+        KermarreckAlgorithm.cpp KermarreckAlgorithm.h NodeWalkInfo.cpp NodeWalkInfo.h)
 
 SET(MOC_HEADERS
 )
@@ -29,6 +29,9 @@ SET(UI_FILES
 
 SET(RESOURCE_FILES
 )
+
+set (CMAKE_CXX_STANDARD 11)
+set (CMAKE_CXX_FLAGS -std=c++11)
 
 INCLUDE_DIRECTORIES(${TULIP_INCLUDE_DIR} ${QT_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
