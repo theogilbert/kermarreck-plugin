@@ -4,15 +4,22 @@
 
 
 NodeWalkInfo::NodeWalkInfo() :
-    NodeWalkInfo(0, 0)
+    NodeWalkInfo(0, 0, 1)
 {}
+
+
+NodeWalkInfo::NodeWalkInfo(unsigned int threadCount) :
+    NodeWalkInfo(threadCount, 0, 1)
+{}
+
 
 // A lower standard deviation means the node is more central. So a node that is never walked on needs to have a big
 // value as its default standard deviation value
-NodeWalkInfo::NodeWalkInfo(unsigned int threadCount, unsigned int requiredReturns) :
+NodeWalkInfo::NodeWalkInfo(unsigned int threadCount, unsigned int requiredReturns, unsigned int nodeId) :
     standardDeviation(std::numeric_limits<double>::max()), threadCount(threadCount),
-    requiredReturns(requiredReturns), lastThreadTick(threadCount, -1)
-{}
+    requiredReturns(requiredReturns), lastThreadTick(threadCount, -1), lastStandardDeviation(0)
+{
+}
 
 NodeWalkInfo::NodeWalkInfo(const NodeWalkInfo &other) {
     *this = other;
@@ -21,6 +28,7 @@ NodeWalkInfo::NodeWalkInfo(const NodeWalkInfo &other) {
 NodeWalkInfo &NodeWalkInfo::operator=(const NodeWalkInfo &other) {
 
     standardDeviation = other.standardDeviation;
+    lastStandardDeviation = other.lastStandardDeviation;
 
     requiredReturns = other.requiredReturns;
     returnTimes = other.returnTimes;
@@ -59,24 +67,34 @@ void NodeWalkInfo::submitTick(unsigned int threadId, unsigned int tick) {
 
 void NodeWalkInfo::calculateStandardDeviation() {
 
-    // On large graphs, we need a large number to store the sum of the squares of offsets to avoid an overflow
-    unsigned long long int sumTicks = 0;
-    unsigned long long int sumTicksCarre = 0;
+    long long int sum = 0;
+    for (int i = 0; i < returnTimes.size(); i++)	{
+        sum += returnTimes[i];
+    }
+    double mean = (double) sum / returnTimes.size();
 
-    for(int i = 0; i < returnTimes.size(); i++)
+    double variance = 0;
+    for (int i = 0; i < returnTimes.size(); i++)
     {
-        unsigned long long int returnTime = (unsigned long long int) (returnTimes[i]);
-        sumTicks += returnTime;
-        sumTicksCarre += returnTime * returnTime;
+        variance += pow(returnTimes[i] - mean, 2);
     }
 
-    sumTicks /= (returnTimes.size() - 1);
-    sumTicksCarre /= (returnTimes.size() - 1);
-
-    standardDeviation = sqrt((double) (sumTicksCarre - (sumTicks*sumTicks)));
+    lastStandardDeviation = standardDeviation;
+    standardDeviation = sqrt(variance / returnTimes.size());
 }
 
 bool NodeWalkInfo::hasConverged() const {
+
+    double epsilon = lastStandardDeviation / 100.0;
+
+    if(!hasEnoughReturnTimes()) {
+        return false;
+    }
+
+    return lastStandardDeviation - epsilon <= standardDeviation && standardDeviation <= lastStandardDeviation + epsilon;
+}
+
+bool NodeWalkInfo::hasEnoughReturnTimes() const {
     // returnTimes.size() >= requiredReturns + 1
     return returnTimes.size() > requiredReturns;
 }

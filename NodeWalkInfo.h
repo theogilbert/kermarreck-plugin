@@ -17,7 +17,8 @@ class NodeWalkInfo {
 public:
 
     NodeWalkInfo();
-    NodeWalkInfo(unsigned int threadCount, unsigned int requiredReturns);
+    NodeWalkInfo(unsigned int threadCount);
+    NodeWalkInfo(unsigned int threadCount, unsigned int requiredReturns, unsigned int nodeId);
     NodeWalkInfo(const NodeWalkInfo& other);
 
     NodeWalkInfo& operator=(const NodeWalkInfo& other);
@@ -25,6 +26,8 @@ public:
     void submitTick(unsigned int threadId, unsigned int tick);
 
     bool hasConverged() const;
+
+    bool hasEnoughReturnTimes() const;
 
     double getStandardDeviation() const { return standardDeviation; }
 
@@ -37,6 +40,8 @@ private:
     // Threads will have an id between 0 and threadCount, might as well use a std::vector and use the index as the id
     // of a thread to save some computation time
     std::vector<int> lastThreadTick;
+
+    double lastStandardDeviation;
 
     double standardDeviation;
 
