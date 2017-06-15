@@ -14,8 +14,10 @@ PLUGIN(KermarreckAlgorithm)
 // and declare the algorithm dependencies too.
 //   addDependency("name", "version");
 KermarreckAlgorithm::KermarreckAlgorithm(const tlp::PluginContext* context) :
-        DoubleAlgorithm(context) {
-	addInParameter<double>("nbReturnTimes","Number of return times for every node", "30", false);
+        DoubleAlgorithm(context), generator(rand_dev()) {
+	addInParameter<int>("nbReturnTimes","Number of return times for every node", "30", false);
+	addInParameter<int>("tickLimit","Number ticks per thread before stopping if no convergence", "10000", false);
+	addInParameter<int>("numberOfThreads","Number of random walks", "8", false);
 }
 
 // The run method is the main method :
@@ -23,84 +25,118 @@ KermarreckAlgorithm::KermarreckAlgorithm(const tlp::PluginContext* context) :
 //     - It is the starting point of your algorithm.
 // The returned value must be true if your algorithm succeeded.
 bool KermarreckAlgorithm::run() {
-    result->setAllNodeValue(0.0);
-	srand(time(NULL));
-	node n;  
-	double nbReturnTimes;
+
+	result->setAllNodeValue(0.0);
+
+	int numberOfThreads = 0;
+	int nbReturnTimes = 0;
+	int tickLimit = 0;
 	if (dataSet!=NULL) {
 		dataSet->get("nbReturnTimes", nbReturnTimes);
+		dataSet->get("tickLimit", tickLimit);
+		dataSet->get("numberOfThreads", numberOfThreads);
 	}
-	
+
+    cout << "Nb return times : " << nbReturnTimes << endl;
 	Iterator<node> * itNode = graph->getNodes();
-	for (int i = 0; i < graph->numberOfNodes(); i++){
-		std::vector<std::future<double>> futures;		
-		//Launch a group of threads
-		vector<node> nodes;
-		int j = 0;		
-		while(itNode->hasNext() && j < graph->numberOfNodes()){
-			n = itNode->next();
-			nodes.push_back(n);
-			futures.push_back (async(& KermarreckAlgorithm::randomWalk, this, n, nbReturnTimes));
-			j++;
-		}	
-		int c = 0;
-		for(auto &e : futures) {
-			result->setNodeValue(nodes.at(c), e.get());
-			c++;
-		}
+    while(itNode->hasNext()){
+        node n = itNode->next();
+			
+		if (graph->deg(n) > 0)
+			nodeWalkInfos[n.id] = NodeWalkInfo(numberOfThreads, (unsigned int) nbReturnTimes, n.id);
+    }
+
+	delete itNode;
+	
+	vector<future<int>> futures;	
+	for (int i = 0; i < numberOfThreads; i++){		
+		futures.push_back(async(& KermarreckAlgorithm::randomWalk, this, nbReturnTimes, tickLimit, i));				
 	}
 	
-	delete itNode;
+    for(auto &e : futures) {
+		e.get();
+	}
+
+	
+    // Once the walk is over, we set the property for all nodes
+    itNode = graph->getNodes();
+    while(itNode->hasNext()){
+        node n = itNode->next();
+
+        NodeWalkInfo& walkInfo = nodeWalkInfos[n.id];
+
+        result->setNodeValue(n, walkInfo.getStandardDeviation());		
+    }
+    delete itNode;
+
     return true;
 }
 
-double KermarreckAlgorithm::randomWalk(node n, double nbReturnTimes)
+int KermarreckAlgorithm::randomWalk(double requiredReturnTime, int tickLimit, int numThread)
 {
-	int tick = 0;
-	node currentNode = n;
-	//node previousNode = n;
-	vector<int> ticks;
-	if (graph->deg(currentNode) > 0){
-		while(ticks.size() < nbReturnTimes)
-		{
-			Iterator<node> *itNode = graph->getInOutNodes(currentNode);
-			node nextNode;
-			int randNode = rand() % graph->deg(currentNode);
-			int i = 0;
-			while(itNode->hasNext() && i < randNode)
-			{
-				itNode->next();
-				i++;
-			}
-			nextNode = itNode->next();		
-			delete itNode;
-			if(rand()/(double)RAND_MAX < (double)((double)(graph->deg(currentNode)) / graph->deg(nextNode)))
-			{
-				//previousNode = currentNode;
-				currentNode = nextNode;
-			}
-			
-			if(currentNode.id == n.id)
-			{
-				ticks.push_back(tick);
-			}
-			tick++;
+
+    uniform_real_distribution<double> real_distribution(0.0, 1.0);
+
+    unsigned int nodeCount = (unsigned int) (nodeWalkInfos.size() * 0.9);
+    set<unsigned int> convergedNodes;
+
+	unsigned int tick = 0;	
+	
+	// find valids nodes
+	node currentNode;
+	bool nodeTrouvee = false;
+	while (nodeTrouvee == false){
+		currentNode = graph->getRandomNode();
+		if (graph->deg(currentNode) > 0){
+			nodeTrouvee = true;
 		}
-		double sumTicks = 0;
-		for(int i = 0; i < ticks.size(); i++)
-		{
-			sumTicks += ticks.at(i);
-		}
-		sumTicks /= (ticks.size());
-		double sumTicksCarre = 0;
-		for(int i = 0; i < ticks.size(); i++)
-		{
-			sumTicksCarre += ticks.at(i)*ticks.at(i);
-		}
-		sumTicksCarre /= (ticks.size());
-		
-		
-		return sqrt(sumTicksCarre - (sumTicks*sumTicks));
 	}
+	
+    while(convergedNodes.size() < nodeCount && tick < tickLimit)
+    {
+        Iterator<node> *itNode = graph->getInOutNodes(currentNode);
+        node nextNode;
+
+		int randNode = uniform_int_distribution<int>(0, graph->deg(currentNode) - 1)(generator);
+		int i = 0;
+		while(i < randNode)
+		{
+			itNode->next();
+			i++;
+		}
+		nextNode = itNode->next();			
+
+        delete itNode;
+
+        if(real_distribution(generator) <= ((double)(graph->deg(currentNode)) / graph->deg(nextNode)))
+        {
+            currentNode = nextNode;
+
+			NodeWalkInfo& walkInfo = nodeWalkInfos[currentNode.id];
+			walkInfo.submitTick(numThread, tick);
+
+            if(nodeWalkInfos[currentNode.id].hasConverged()) {
+                convergedNodes.insert(currentNode.id);
+            }
+
+            tick++;
+        }
+    }
+
+    Iterator<node> * itNode = graph->getNodes();
+    while(itNode->hasNext()){
+        node n = itNode->next();
+
+        if(nodeThreads[n.id].joinable()) {
+            nodeThreads[n.id].join();
+        }
+    }
+    delete itNode;
+
+    cout << convergedNodes.size() << "/" << nodeCount << " node have converged after ";
+    cout << tick << " steps." << endl;
+	
 	return 0;
 }
+
+
