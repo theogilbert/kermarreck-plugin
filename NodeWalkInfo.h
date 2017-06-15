@@ -19,7 +19,7 @@ public:
 
     NodeWalkInfo();
     NodeWalkInfo(unsigned int threadCount);
-    NodeWalkInfo(unsigned int threadCount, unsigned int requiredReturns, unsigned int nodeId);
+    NodeWalkInfo(unsigned int threadCount, unsigned int requiredReturns, unsigned int epsilon, unsigned int nodeId);
     NodeWalkInfo(const NodeWalkInfo& other);
 
     ~NodeWalkInfo();
@@ -49,7 +49,9 @@ private:
     double standardDeviation;
 
     unsigned int requiredReturns;
-
+	
+	unsigned int epsilon;
+	
     unsigned int threadCount;
 
     omp_lock_t writelock;

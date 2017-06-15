@@ -4,20 +4,20 @@
 
 
 NodeWalkInfo::NodeWalkInfo() :
-    NodeWalkInfo(0, 0, 1)
+    NodeWalkInfo(0, 0, 0, 1)
 {}
 
 
 NodeWalkInfo::NodeWalkInfo(unsigned int threadCount) :
-    NodeWalkInfo(threadCount, 0, 1)
+    NodeWalkInfo(threadCount, 0, 0, 1)
 {}
 
 
 // A lower standard deviation means the node is more central. So a node that is never walked on needs to have a big
 // value as its default standard deviation value
-NodeWalkInfo::NodeWalkInfo(unsigned int threadCount, unsigned int requiredReturns, unsigned int nodeId) :
+NodeWalkInfo::NodeWalkInfo(unsigned int threadCount, unsigned int requiredReturns, unsigned int epsilon, unsigned int nodeId) :
     standardDeviation(std::numeric_limits<double>::max()), threadCount(threadCount),
-    requiredReturns(requiredReturns), lastThreadTick(threadCount, -1), lastStandardDeviation(0)
+    requiredReturns(requiredReturns), epsilon(epsilon), lastThreadTick(threadCount, -1), lastStandardDeviation(0)
 {
     omp_init_lock(&writelock);
 }
@@ -38,6 +38,7 @@ NodeWalkInfo &NodeWalkInfo::operator=(const NodeWalkInfo &other) {
     lastStandardDeviation = other.lastStandardDeviation;
 
     requiredReturns = other.requiredReturns;
+	epsilon = other.epsilon;
     returnTimes = other.returnTimes;
 
     threadCount = other.threadCount;
@@ -91,14 +92,14 @@ void NodeWalkInfo::calculateStandardDeviation() {
 }
 
 bool NodeWalkInfo::hasConverged() const {
-
-    double epsilon = lastStandardDeviation / 100.0;
+    double epsilonResult = (lastStandardDeviation * (double) epsilon) / 100.0;
 
     if(!hasEnoughReturnTimes()) {
         return false;
     }
 
-    return lastStandardDeviation - epsilon <= standardDeviation && standardDeviation <= lastStandardDeviation + epsilon;
+    return standardDeviation >= lastStandardDeviation - epsilonResult && standardDeviation <= lastStandardDeviation + epsilonResult;
+	//return returnTimes.size() >= requiredReturns;
 }
 
 bool NodeWalkInfo::hasEnoughReturnTimes() const {

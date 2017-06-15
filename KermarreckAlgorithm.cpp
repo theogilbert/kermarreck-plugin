@@ -16,8 +16,9 @@ PLUGIN(KermarreckAlgorithm)
 KermarreckAlgorithm::KermarreckAlgorithm(const tlp::PluginContext* context) :
         DoubleAlgorithm(context), generator(rand_dev()) {
 	addInParameter<int>("nbReturnTimes","Number of return times for every node", "30", false);
-	addInParameter<int>("tickLimit","Number ticks per thread before stopping if no convergence", "10000", false);
+	addInParameter<int>("tickLimit","Number ticks per thread before stopping if no convergence", "10000000", false);
 	addInParameter<int>("numberOfThreads","Number of random walks", "8", false);
+	addInParameter<int>("epsilon","Percentage of variation for convergence", "1", false);
 }
 
 // The run method is the main method :
@@ -31,26 +32,28 @@ bool KermarreckAlgorithm::run() {
 	int numberOfThreads = 0;
 	int nbReturnTimes = 0;
 	int tickLimit = 0;
+	int epsilon = 0;
 	if (dataSet!=NULL) {
 		dataSet->get("nbReturnTimes", nbReturnTimes);
 		dataSet->get("tickLimit", tickLimit);
 		dataSet->get("numberOfThreads", numberOfThreads);
+		dataSet->get("epsilon", epsilon);
 	}
-
+	
     cout << "Nb return times : " << nbReturnTimes << endl;
 	Iterator<node> * itNode = graph->getNodes();
     while(itNode->hasNext()){
         node n = itNode->next();
 			
 		if (graph->deg(n) > 0)
-			nodeWalkInfos[n.id] = NodeWalkInfo((unsigned int) numberOfThreads, (unsigned int) nbReturnTimes, n.id);
+			nodeWalkInfos[n.id] = NodeWalkInfo((unsigned int) numberOfThreads, (unsigned int) nbReturnTimes, (unsigned int) epsilon, n.id);
     }
 
 	delete itNode;
 
     #pragma omp parallel for
 	for (int i = 0; i < numberOfThreads; i++){
-        randomWalk(nbReturnTimes, tickLimit, i);
+        randomWalk(tickLimit, i);
 	}
 
     // Once the walk is over, we set the property for all nodes
@@ -67,12 +70,11 @@ bool KermarreckAlgorithm::run() {
     return true;
 }
 
-int KermarreckAlgorithm::randomWalk(double requiredReturnTime, int tickLimit, int numThread)
+int KermarreckAlgorithm::randomWalk(int tickLimit, int numThread)
 {
     uniform_real_distribution<double> real_distribution(0.0, 1.0);
 
     unsigned int nodeCount = (unsigned int) (nodeWalkInfos.size() * 0.9);
-    set<unsigned int> convergedNodes;
 
 	unsigned int tick = 0;	
 	

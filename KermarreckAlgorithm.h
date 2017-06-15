@@ -7,6 +7,7 @@
 #include <time.h>
 #include <thread>
 #include <future>
+#include <omp.h>
 
 #include "NodeWalkInfo.h"
 
@@ -28,13 +29,15 @@ protected:
     /*
      * Precondition : the map nodeWalkInfos has been filled for each node in the graph
      */
-    int randomWalk(double nbReturnTime, int tickLimit, int numThread);
+    int randomWalk(int tickLimit, int numThread);
 
     std::unordered_map<unsigned int, NodeWalkInfo> nodeWalkInfos;
     std::unordered_map<unsigned int, std::thread> nodeThreads;
 
     std::random_device rand_dev;
     std::mt19937 generator;
+	
+	std::set<unsigned int> convergedNodes;
 };
 
 
