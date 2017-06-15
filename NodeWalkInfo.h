@@ -6,6 +6,7 @@
 #include <cmath>
 #include <map>
 #include <mutex>
+#include <omp.h>
 
 
 /*
@@ -20,6 +21,8 @@ public:
     NodeWalkInfo(unsigned int threadCount);
     NodeWalkInfo(unsigned int threadCount, unsigned int requiredReturns, unsigned int nodeId);
     NodeWalkInfo(const NodeWalkInfo& other);
+
+    ~NodeWalkInfo();
 
     NodeWalkInfo& operator=(const NodeWalkInfo& other);
 
@@ -49,7 +52,7 @@ private:
 
     unsigned int threadCount;
 
-    std::mutex mutex;
+    omp_lock_t writelock;
 
 };
 

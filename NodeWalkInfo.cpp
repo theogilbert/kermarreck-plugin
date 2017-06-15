@@ -19,10 +19,17 @@ NodeWalkInfo::NodeWalkInfo(unsigned int threadCount, unsigned int requiredReturn
     standardDeviation(std::numeric_limits<double>::max()), threadCount(threadCount),
     requiredReturns(requiredReturns), lastThreadTick(threadCount, -1), lastStandardDeviation(0)
 {
+    omp_init_lock(&writelock);
 }
 
 NodeWalkInfo::NodeWalkInfo(const NodeWalkInfo &other) {
+
+    omp_init_lock(&writelock);
     *this = other;
+}
+
+NodeWalkInfo::~NodeWalkInfo() {
+    omp_destroy_lock(&writelock);
 }
 
 NodeWalkInfo &NodeWalkInfo::operator=(const NodeWalkInfo &other) {
@@ -45,7 +52,7 @@ void NodeWalkInfo::submitTick(unsigned int threadId, unsigned int tick) {
 
         int lastTick = lastThreadTick[threadId];
 
-        mutex.lock();
+        omp_set_lock(&writelock);
 
         if(lastTick > 0) {
 
@@ -57,8 +64,8 @@ void NodeWalkInfo::submitTick(unsigned int threadId, unsigned int tick) {
         }
 
         lastThreadTick[threadId] = tick;
-        
-        mutex.unlock();
+
+        omp_unset_lock(&writelock);
     }
     else {
         std::cerr << "Error - wrong thread id " << threadId << std::endl;

@@ -43,21 +43,16 @@ bool KermarreckAlgorithm::run() {
         node n = itNode->next();
 			
 		if (graph->deg(n) > 0)
-			nodeWalkInfos[n.id] = NodeWalkInfo(numberOfThreads, (unsigned int) nbReturnTimes, n.id);
+			nodeWalkInfos[n.id] = NodeWalkInfo((unsigned int) numberOfThreads, (unsigned int) nbReturnTimes, n.id);
     }
 
 	delete itNode;
-	
-	vector<future<int>> futures;	
-	for (int i = 0; i < numberOfThreads; i++){		
-		futures.push_back(async(& KermarreckAlgorithm::randomWalk, this, nbReturnTimes, tickLimit, i));				
-	}
-	
-    for(auto &e : futures) {
-		e.get();
+
+    #pragma omp parallel for
+	for (int i = 0; i < numberOfThreads; i++){
+        randomWalk(nbReturnTimes, tickLimit, i);
 	}
 
-	
     // Once the walk is over, we set the property for all nodes
     itNode = graph->getNodes();
     while(itNode->hasNext()){
@@ -74,7 +69,6 @@ bool KermarreckAlgorithm::run() {
 
 int KermarreckAlgorithm::randomWalk(double requiredReturnTime, int tickLimit, int numThread)
 {
-
     uniform_real_distribution<double> real_distribution(0.0, 1.0);
 
     unsigned int nodeCount = (unsigned int) (nodeWalkInfos.size() * 0.9);
@@ -85,7 +79,7 @@ int KermarreckAlgorithm::randomWalk(double requiredReturnTime, int tickLimit, in
 	// find valids nodes
 	node currentNode;
 	bool nodeTrouvee = false;
-	while (nodeTrouvee == false){
+	while (!nodeTrouvee){
 		currentNode = graph->getRandomNode();
 		if (graph->deg(currentNode) > 0){
 			nodeTrouvee = true;
@@ -113,7 +107,7 @@ int KermarreckAlgorithm::randomWalk(double requiredReturnTime, int tickLimit, in
             currentNode = nextNode;
 
 			NodeWalkInfo& walkInfo = nodeWalkInfos[currentNode.id];
-			walkInfo.submitTick(numThread, tick);
+			walkInfo.submitTick((unsigned int) numThread, tick);
 
             if(nodeWalkInfos[currentNode.id].hasConverged()) {
                 convergedNodes.insert(currentNode.id);
@@ -133,7 +127,7 @@ int KermarreckAlgorithm::randomWalk(double requiredReturnTime, int tickLimit, in
     }
     delete itNode;
 
-    cout << convergedNodes.size() << "/" << nodeCount << " node have converged after ";
+    cout << "Thread " << numThread << " - " << convergedNodes.size() << "/" << nodeCount << " node have converged after ";
     cout << tick << " steps." << endl;
 	
 	return 0;
