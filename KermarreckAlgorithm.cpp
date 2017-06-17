@@ -27,6 +27,8 @@ KermarreckAlgorithm::KermarreckAlgorithm(const tlp::PluginContext* context) :
 // The returned value must be true if your algorithm succeeded.
 bool KermarreckAlgorithm::run() {
 
+    omp_init_lock(&convergedNodesLock);
+
 	result->setAllNodeValue(0.0);
 
 	int numberOfThreads = 0;
@@ -67,6 +69,8 @@ bool KermarreckAlgorithm::run() {
     }
     delete itNode;
 
+    omp_destroy_lock(&convergedNodesLock);
+
     return true;
 }
 
@@ -76,7 +80,7 @@ int KermarreckAlgorithm::randomWalk(int tickLimit, int numThread)
 
     unsigned int nodeCount = (unsigned int) (nodeWalkInfos.size() * 0.9);
 
-	unsigned int tick = 0;	
+	unsigned int tick = 0;
 	
 	// find valids nodes
 	node currentNode;
@@ -111,23 +115,16 @@ int KermarreckAlgorithm::randomWalk(int tickLimit, int numThread)
 			NodeWalkInfo& walkInfo = nodeWalkInfos[currentNode.id];
 			walkInfo.submitTick((unsigned int) numThread, tick);
 
-            if(nodeWalkInfos[currentNode.id].hasConverged()) {
+            if(nodeWalkInfos[currentNode.id].hasConverged() && convergedNodes.find(currentNode.id) == convergedNodes.end()) {
+
+                omp_set_lock(&convergedNodesLock);
                 convergedNodes.insert(currentNode.id);
+                omp_unset_lock(&convergedNodesLock);
             }
 
             tick++;
         }
     }
-
-    Iterator<node> * itNode = graph->getNodes();
-    while(itNode->hasNext()){
-        node n = itNode->next();
-
-        if(nodeThreads[n.id].joinable()) {
-            nodeThreads[n.id].join();
-        }
-    }
-    delete itNode;
 
     cout << "Thread " << numThread << " - " << convergedNodes.size() << "/" << nodeCount << " node have converged after ";
     cout << tick << " steps." << endl;

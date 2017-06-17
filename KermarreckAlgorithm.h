@@ -32,12 +32,13 @@ protected:
     int randomWalk(int tickLimit, int numThread);
 
     std::unordered_map<unsigned int, NodeWalkInfo> nodeWalkInfos;
-    std::unordered_map<unsigned int, std::thread> nodeThreads;
 
     std::random_device rand_dev;
     std::mt19937 generator;
 	
 	std::set<unsigned int> convergedNodes;
+
+    omp_lock_t convergedNodesLock;
 };
 
 
