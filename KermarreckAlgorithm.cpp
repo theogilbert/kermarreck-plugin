@@ -15,9 +15,9 @@ PLUGIN(KermarreckAlgorithm)
 //   addDependency("name", "version");
 KermarreckAlgorithm::KermarreckAlgorithm(const tlp::PluginContext* context) :
         DoubleAlgorithm(context), generator(rand_dev()) {
-	addInParameter<int>("nbReturnTimes","Number of return times for every node", "30", false);
-	addInParameter<int>("tickLimit","Number ticks per thread before stopping if no convergence", "10000000", false);
-	addInParameter<int>("numberOfThreads","Number of random walks", "8", false);
+	addInParameter<int>("k","Number of return times for every node", "30", false);
+	addInParameter<int>("limit","Number ticks per thread before stopping if no convergence", "10000000", false);
+	addInParameter<int>("threads","Number of random walks", "8", false);
 	addInParameter<int>("epsilon","Percentage of variation for convergence", "1", false);
 }
 
@@ -36,13 +36,12 @@ bool KermarreckAlgorithm::run() {
 	int tickLimit = 0;
 	int epsilon = 0;
 	if (dataSet!=NULL) {
-		dataSet->get("nbReturnTimes", nbReturnTimes);
-		dataSet->get("tickLimit", tickLimit);
-		dataSet->get("numberOfThreads", numberOfThreads);
+		dataSet->get("k", nbReturnTimes);
+		dataSet->get("limit", tickLimit);
+		dataSet->get("threads", numberOfThreads);
 		dataSet->get("epsilon", epsilon);
 	}
-	
-    cout << "Nb return times : " << nbReturnTimes << endl;
+
 	Iterator<node> * itNode = graph->getNodes();
     while(itNode->hasNext()){
         node n = itNode->next();
@@ -50,7 +49,6 @@ bool KermarreckAlgorithm::run() {
 		if (graph->deg(n) > 0)
 			nodeWalkInfos[n.id] = NodeWalkInfo((unsigned int) numberOfThreads, (unsigned int) nbReturnTimes, (unsigned int) epsilon, n.id);
     }
-
 	delete itNode;
 
     #pragma omp parallel for
@@ -126,8 +124,11 @@ int KermarreckAlgorithm::randomWalk(int tickLimit, int numThread)
         }
     }
 
-    cout << "Thread " << numThread << " - " << convergedNodes.size() << "/" << nodeCount << " node have converged after ";
-    cout << tick << " steps." << endl;
+	#pragma omp critical (thread_result)
+	{
+		cout << "Thread " << numThread << " - " << convergedNodes.size() << "/" << nodeCount << " node have converged after ";
+		cout << tick << " steps." << endl;
+	}
 	
 	return 0;
 }
