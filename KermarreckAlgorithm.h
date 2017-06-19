@@ -29,6 +29,14 @@ public:
 
     KermarreckAlgorithm(const tlp::PluginContext* context);
 
+    /*
+     * Checks that the right conditions are met to run the algorithm
+     */
+    bool check(std::string& errorMsg);
+
+    /*
+     * Runs the algorithm
+     */
     bool run();
 protected:
 

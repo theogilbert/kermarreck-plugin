@@ -21,6 +21,23 @@ KermarreckAlgorithm::KermarreckAlgorithm(const tlp::PluginContext* context) :
 	addInParameter<int>("epsilon","Percentage of variation for convergence", "1", false);
 }
 
+/*
+ * The algorithm can be run if there is only one connected component in the graph
+ */
+bool KermarreckAlgorithm::check(std::string &errorMsg) {
+
+    std::vector<std::set<tlp::node>> components;
+    ConnectedTest::computeConnectedComponents(graph, components);
+
+    if(components.size() != 1) {
+        errorMsg = "The graph must be connected";
+        return false;
+    }
+
+    return true;
+}
+
+
 // The run method is the main method :
 //     - It will be called out if the pre-condition method (bool check (..)) returned true.
 //     - It is the starting point of your algorithm.
@@ -132,5 +149,3 @@ int KermarreckAlgorithm::randomWalk(int tickLimit, int numThread)
 	
 	return 0;
 }
-
-
