@@ -15,17 +15,36 @@ PLUGIN(KermarreckAlgorithm)
 //   addDependency("name", "version");
 KermarreckAlgorithm::KermarreckAlgorithm(const tlp::PluginContext* context) :
         DoubleAlgorithm(context), generator(rand_dev()) {
-	addInParameter<int>("nbReturnTimes","Number of return times for every node", "30", false);
-	addInParameter<int>("tickLimit","Number ticks per thread before stopping if no convergence", "10000000", false);
-	addInParameter<int>("numberOfThreads","Number of random walks", "8", false);
+	addInParameter<int>("k","Number of return times for every node", "30", false);
+	addInParameter<int>("limit","Number ticks per thread before stopping if no convergence", "10000000", false);
+	addInParameter<int>("threads","Number of random walks", "8", false);
 	addInParameter<int>("epsilon","Percentage of variation for convergence", "1", false);
 }
+
+/*
+ * The algorithm can be run if there is only one connected component in the graph
+ */
+bool KermarreckAlgorithm::check(std::string &errorMsg) {
+
+    std::vector<std::set<tlp::node>> components;
+    ConnectedTest::computeConnectedComponents(graph, components);
+
+    if(components.size() != 1) {
+        errorMsg = "The graph must be connected";
+        return false;
+    }
+
+    return true;
+}
+
 
 // The run method is the main method :
 //     - It will be called out if the pre-condition method (bool check (..)) returned true.
 //     - It is the starting point of your algorithm.
 // The returned value must be true if your algorithm succeeded.
 bool KermarreckAlgorithm::run() {
+
+    omp_init_lock(&convergedNodesLock);
 
 	result->setAllNodeValue(0.0);
 
@@ -34,13 +53,12 @@ bool KermarreckAlgorithm::run() {
 	int tickLimit = 0;
 	int epsilon = 0;
 	if (dataSet!=NULL) {
-		dataSet->get("nbReturnTimes", nbReturnTimes);
-		dataSet->get("tickLimit", tickLimit);
-		dataSet->get("numberOfThreads", numberOfThreads);
+		dataSet->get("k", nbReturnTimes);
+		dataSet->get("limit", tickLimit);
+		dataSet->get("threads", numberOfThreads);
 		dataSet->get("epsilon", epsilon);
 	}
-	
-    cout << "Nb return times : " << nbReturnTimes << endl;
+
 	Iterator<node> * itNode = graph->getNodes();
     while(itNode->hasNext()){
         node n = itNode->next();
@@ -48,7 +66,6 @@ bool KermarreckAlgorithm::run() {
 		if (graph->deg(n) > 0)
 			nodeWalkInfos[n.id] = NodeWalkInfo((unsigned int) numberOfThreads, (unsigned int) nbReturnTimes, (unsigned int) epsilon, n.id);
     }
-
 	delete itNode;
 
     #pragma omp parallel for
@@ -67,6 +84,8 @@ bool KermarreckAlgorithm::run() {
     }
     delete itNode;
 
+    omp_destroy_lock(&convergedNodesLock);
+
     return true;
 }
 
@@ -76,7 +95,7 @@ int KermarreckAlgorithm::randomWalk(int tickLimit, int numThread)
 
     unsigned int nodeCount = (unsigned int) (nodeWalkInfos.size() * 0.9);
 
-	unsigned int tick = 0;	
+	unsigned int tick = 0;
 	
 	// find valids nodes
 	node currentNode;
@@ -111,28 +130,22 @@ int KermarreckAlgorithm::randomWalk(int tickLimit, int numThread)
 			NodeWalkInfo& walkInfo = nodeWalkInfos[currentNode.id];
 			walkInfo.submitTick((unsigned int) numThread, tick);
 
-            if(nodeWalkInfos[currentNode.id].hasConverged()) {
+            if(nodeWalkInfos[currentNode.id].hasConverged() && convergedNodes.find(currentNode.id) == convergedNodes.end()) {
+
+                omp_set_lock(&convergedNodesLock);
                 convergedNodes.insert(currentNode.id);
+                omp_unset_lock(&convergedNodesLock);
             }
 
             tick++;
         }
     }
 
-    Iterator<node> * itNode = graph->getNodes();
-    while(itNode->hasNext()){
-        node n = itNode->next();
-
-        if(nodeThreads[n.id].joinable()) {
-            nodeThreads[n.id].join();
-        }
-    }
-    delete itNode;
-
-    cout << "Thread " << numThread << " - " << convergedNodes.size() << "/" << nodeCount << " node have converged after ";
-    cout << tick << " steps." << endl;
+	#pragma omp critical (thread_result)
+	{
+		cout << "Thread " << numThread << " - " << convergedNodes.size() << "/" << nodeCount << " node have converged after ";
+		cout << tick << " steps." << endl;
+	}
 	
 	return 0;
 }
-
-

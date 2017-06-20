@@ -7,17 +7,14 @@ NodeWalkInfo::NodeWalkInfo() :
     NodeWalkInfo(0, 0, 0, 1)
 {}
 
-
-NodeWalkInfo::NodeWalkInfo(unsigned int threadCount) :
-    NodeWalkInfo(threadCount, 0, 0, 1)
-{}
-
-
-// A lower standard deviation means the node is more central. So a node that is never walked on needs to have a big
-// value as its default standard deviation value
+/*
+ * A lower standard deviation means the node is more central. So a node that is never walked on needs to have a big
+ * value as its default standard deviation value
+ */
 NodeWalkInfo::NodeWalkInfo(unsigned int threadCount, unsigned int requiredReturns, unsigned int epsilon, unsigned int nodeId) :
     standardDeviation(std::numeric_limits<double>::max()), threadCount(threadCount),
-    requiredReturns(requiredReturns), epsilon(epsilon), lastThreadTick(threadCount, -1), lastStandardDeviation(0)
+    requiredReturns(requiredReturns), epsilon(epsilon), lastThreadTick(threadCount, -1), lastStandardDeviation(0),
+    nodeId(nodeId)
 {
     omp_init_lock(&writelock);
 }
@@ -34,6 +31,7 @@ NodeWalkInfo::~NodeWalkInfo() {
 
 NodeWalkInfo &NodeWalkInfo::operator=(const NodeWalkInfo &other) {
 
+    nodeId = other.nodeId;
     standardDeviation = other.standardDeviation;
     lastStandardDeviation = other.lastStandardDeviation;
 
